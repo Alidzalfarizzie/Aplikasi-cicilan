@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#007bff">
+<link rel="manifest" href="manifest.json">
+<title>Aplikasi Cicilan Pro+</title>
+
+<style>
+body {
+  margin: 0;
+  padding: 20px;
+  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #4facfe, #00f2fe);
+  padding: 20px;
+  text-align: center;
+}
+
+/* CARD */
+.box, .rekap, .filter {
+  background: white;
+  padding: 18px;
+  border-radius: 15px;
+  width: 100%;
+  max-width: 340px;
+  margin: 12px auto;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  transition: 0.3s;
+}
+
+.box:hover, .item:hover {
+  transform: translateY(-3px);
+}
+
+/* INPUT */
+input, select {
+  width: 100%;
+  padding: 10px;
+  margin: 6px 0;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  outline: none;
+}
+
+/* BUTTON */
+button {
+  width: 100%;
+  padding: 10px;
+  margin: 6px 0;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #007bff, #00c6ff);
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+/* ITEM DATA */
+.item {
+  background: white;
+  margin: 10px auto;
+  padding: 15px;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 340px;
+  text-align: left;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+  transition: 0.3s;
+}
+
+/* STATUS WARNA */
+.lunas {
+  border-left: 6px solid #00c851;
+}
+
+.belum {
+  border-left: 6px solid #ff4444;
+}
+
+/* BUTTON KHUSUS */
+.btn-hapus {
+  background: linear-gradient(135deg, #ff4b2b, #ff0000);
+}
+
+.btn-riwayat {
+  background: linear-gradient(135deg, #6a11cb, #2575fc);
+}
+
+/* RIWAYAT */
+.riwayat-box {
+  margin-top: 10px;
+  padding: 10px;
+  background: #f5f7fa;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+/* TITLE */
+h3 {
+  margin-bottom: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="box">
+<h3>Aplikasi Cicilan</h3>
+
+<input id="nama" placeholder="Nama">
+<input id="modal" type="number" placeholder="Modal">
+<input id="bunga" type="number" value="3">
+<input id="bulan" type="number" placeholder="Tenor">
+<input id="jatuhTempo" type="date">
+
+<button onclick="hitung()">Hitung</button>
+<button onclick="simpan()">Simpan</button>
+
+<div id="hasil"></div>
+</div>
+
+<div class="filter">
+<select id="filterNama" onchange="tampilkan()">
+<option value="">Semua Pelanggan</option>
+</select>
+
+<button onclick="backup()">Backup Data</button>
+</div>
+
+<div class="rekap" id="rekap"></div>
+
+<div id="dataList"></div>
+
+<script>
+let hasilData = null;
+
+function rp(x){
+  return (x || 0).toLocaleString('id-ID');
+}
+
+function hitung(){
+let m=+modal.value,b=+bunga.value,bl=+bulan.value;
+
+if(m <= 0 || bl <= 0){
+  alert("Modal & tenor harus lebih dari 0");
+  return;
+}
+let untungBul=m*(b/100);
+let totalUntung=untungBul*bl;
+let total=m+totalUntung;
+let cicilan=total/bl;
+
+hasilData={modal:m,total,totalUntung,cicilan,bulan:bl,terbayar:0,riwayat:[]};
+
+hasil.innerHTML=`
+Total: Rp ${rp(total)}<br>
+Cicilan: Rp ${rp(cicilan.toFixed(0))}
+`;
+}
+
+function simpan(){
+  if(!nama.value || !hasilData || !hasilData.modal){
+    alert("Harus klik hitung dulu!");
+    return;
+  }
+
+  let data = JSON.parse(localStorage.cicilan || "[]");
+
+  data.push({
+    nama: nama.value,
+    ...hasilData,
+    jatuhTempo: jatuhTempo.value,
+    riwayat: []
+  });
+
+  localStorage.cicilan = JSON.stringify(data);
+  tampilkan();
+
+  // 🔥 RESET INPUT
+  nama.value = "";
+  modal.value = "";
+  bulan.value = "";
+  jatuhTempo.value = "";
+  bunga.value = 3;
+  hasil.innerHTML = "";
+
+  // 🔥 BONUS: fokus balik ke nama (biar cepat input lagi)
+  nama.focus();
+}
+
+function bayar(i){
+let data=JSON.parse(localStorage.cicilan);
+let jumlah=prompt("Masukkan pembayaran:");
+
+if(!jumlah)return;
+
+jumlah=Number(jumlah);
+if(jumlah<=0){
+  alert("Nominal tidak valid!");
+  return;
+}
+if(jumlah > (data[i].total - data[i].terbayar)){
+  alert("Pembayaran melebihi sisa!");
+  return;
+}
+let tanggal=new Date().toLocaleDateString('id-ID');
+
+data[i].terbayar+=jumlah;
+
+// 🔥 SIMPAN RIWAYAT
+if(!data[i].riwayat) data[i].riwayat=[];
+data[i].riwayat.push({
+  tanggal: tanggal,
+  nominal: jumlah
+});
+
+localStorage.cicilan=JSON.stringify(data);
+tampilkan();
+}
+
+function lihatRiwayat(i){
+  let data=JSON.parse(localStorage.cicilan);
+  let d=data[i];
+  let box = document.getElementById("riwayatBox"+i);
+
+  // 🔁 toggle
+  if(box.innerHTML !== ""){
+    box.innerHTML = "";
+    return;
+  }
+
+  if(!d.riwayat || d.riwayat.length==0){
+    box.innerHTML = "Belum ada riwayat";
+    return;
+  }
+
+  let html="<b>📒 Riwayat Pembayaran</b><br><br>";
+
+  d.riwayat.forEach((r,idx)=>{
+    html+=`${idx+1}. ${r.tanggal} - Rp ${rp(r.nominal)}<br>`;
+  });
+
+  box.innerHTML=html;
+}
+
+function hapus(i){
+let data=JSON.parse(localStorage.cicilan);
+data.splice(i,1);
+localStorage.cicilan=JSON.stringify(data);
+tampilkan();
+}
+
+function tampilkan(){
+let data=JSON.parse(localStorage.cicilan||"[]");
+let f=filterNama.value;
+
+let html="";
+let totalModal=0,totalUntung=0;
+
+let namaUnik=[...new Set(data.map(d=>d.nama))];
+
+filterNama.innerHTML=`<option value="">Semua Pelanggan</option>`+
+namaUnik.map(n=>`<option ${n==f?"selected":""}>${n}</option>`).join("");
+
+data.forEach((d,i)=>{
+if(!d.modal) return;
+if(f && d.nama!=f)return;
+
+let sisa=d.total-d.terbayar;
+let isLunas = sisa <= 0;
+let status = isLunas ? "✅ LUNAS" : "❌ BELUM";
+
+totalModal+=d.modal;
+totalUntung+=d.totalUntung;
+
+html+=`
+<div class="item ${isLunas?"lunas":"belum"}">
+<b>${d.nama}</b><br>
+Total: Rp ${rp(d.total)}<br>
+Bayar: Rp ${rp(d.terbayar)}<br>
+Sisa: Rp ${rp(sisa)}<br>
+Status: <span style="color:${isLunas?"green":"red"}">${status}</span><br>
+Jatuh Tempo: ${d.jatuhTempo||"-"}<br>
+
+<button onclick="bayar(${i})">💰 Bayar</button>
+<button onclick="lihatRiwayat(${i})" class="btn-riwayat">📒 Riwayat</button>
+<button onclick="hapus(${i})" class="btn-hapus">🗑 Hapus</button>
+
+<div id="riwayatBox${i}" class="riwayat-box"></div>
+</div>`;
+});
+
+dataList.innerHTML=html;
+
+rekap.innerHTML=`
+<b>REKAP</b><br>
+Pelanggan: ${data.length}<br>
+Modal: Rp ${rp(totalModal)}<br>
+Untung: Rp ${rp(totalUntung)}
+`;
+}
+
+function backup(){
+let data=localStorage.cicilan;
+let blob=new Blob([data],{type:"application/json"});
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download="backup_cicilan.json";
+a.click();
+}
+
+tampilkan();
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js")
+    .then(() => console.log("SW aktif"))
+    .catch(err => console.log("SW gagal", err));
+}
+</script>
+</body>
+</html>
